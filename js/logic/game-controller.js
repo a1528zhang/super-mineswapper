@@ -1,6 +1,18 @@
-const { GAME_STATES } = require('../config/game-config');
-const { createBoard, floodReveal, forEachNeighbor, placeMines, revealAllMines } = require('./board');
-const { flagRemainingMines, hasWon } = require('./victory');
+const { GAME_STATES, MAX_ROWS, NEW_ROW_INTERVAL_SECONDS, ROW_CLEAR_ANIMATION_MS } = require('../config/game-config');
+const {
+  addGrowthRow,
+  countFlags,
+  countMines,
+  countRevealedSafeCells,
+  createBoard,
+  findFullyRevealedSafeRows,
+  floodReveal,
+  forEachNeighbor,
+  placeMines,
+  removeRows,
+  revealAllMines
+} = require('./board');
+const { hasWon } = require('./victory');
 
 function createGameController() {
   const game = {
@@ -8,7 +20,15 @@ function createGameController() {
     state: GAME_STATES.READY,
     revealedCount: 0,
     flaggedCount: 0,
-    firstMove: true
+    mineCount: 0,
+    firstMove: true,
+    startTime: 0,
+    finishedAt: 0,
+    elapsedSeconds: 0,
+    nextGrowthAt: NEW_ROW_INTERVAL_SECONDS,
+    clearingRows: [],
+    clearAnimationStartedAt: 0,
+    clearAnimationDuration: ROW_CLEAR_ANIMATION_MS
   };
 
   function reset() {
@@ -16,7 +36,15 @@ function createGameController() {
     game.state = GAME_STATES.READY;
     game.revealedCount = 0;
     game.flaggedCount = 0;
+    game.mineCount = 0;
     game.firstMove = true;
+    game.startTime = 0;
+    game.finishedAt = 0;
+    game.elapsedSeconds = 0;
+    game.nextGrowthAt = NEW_ROW_INTERVAL_SECONDS;
+    game.clearingRows = [];
+    game.clearAnimationStartedAt = 0;
+    game.clearAnimationDuration = ROW_CLEAR_ANIMATION_MS;
   }
 
   function revealCell(row, col) {
@@ -31,19 +59,22 @@ function createGameController() {
 
     if (game.firstMove) {
       placeMines(game.board, row, col);
+      game.mineCount = countMines(game.board);
       game.firstMove = false;
       game.state = GAME_STATES.PLAYING;
+      startTimer();
     }
 
     if (cell.mine) {
       cell.revealed = true;
       game.state = GAME_STATES.LOST;
       revealAllMines(game.board);
+      stopTimer();
       return;
     }
 
     revealSafeCell(cell);
-    checkWin();
+    finishTurn();
   }
 
   function revealAroundNumber(row, col) {
@@ -80,6 +111,7 @@ function createGameController() {
         neighbor.revealed = true;
         game.state = GAME_STATES.LOST;
         revealAllMines(game.board);
+        stopTimer();
         return;
       }
     }
@@ -88,7 +120,7 @@ function createGameController() {
       revealSafeCell(hiddenUnflaggedNeighbors[i]);
     }
 
-    checkWin();
+    finishTurn();
   }
 
   function toggleFlag(row, col) {
@@ -104,8 +136,37 @@ function createGameController() {
     cell.flagged = !cell.flagged;
     game.flaggedCount += cell.flagged ? 1 : -1;
 
-    if (game.state === GAME_STATES.READY) {
+    if (game.state === GAME_STATES.READY && !game.firstMove) {
       game.state = GAME_STATES.PLAYING;
+      startTimer();
+    }
+  }
+
+  function updateElapsedTime() {
+    if (!game.startTime) {
+      game.elapsedSeconds = 0;
+      return;
+    }
+
+    const endTime = game.finishedAt || Date.now();
+    game.elapsedSeconds = Math.floor((endTime - game.startTime) / 1000);
+  }
+
+  function tick() {
+    updateElapsedTime();
+    commitFinishedRowClearAnimation();
+
+    if (game.state !== GAME_STATES.PLAYING) {
+      return;
+    }
+
+    while (game.elapsedSeconds >= game.nextGrowthAt && game.state === GAME_STATES.PLAYING) {
+      addGrowthRow(game.board);
+      game.mineCount = countMines(game.board);
+      game.flaggedCount = countFlags(game.board);
+      game.revealedCount = countRevealedSafeCells(game.board);
+      game.nextGrowthAt += NEW_ROW_INTERVAL_SECONDS;
+      checkOverflowLoss();
     }
   }
 
@@ -117,11 +178,79 @@ function createGameController() {
     game.revealedCount += floodReveal(game.board, cell);
   }
 
-  function checkWin() {
-    if (hasWon(game.revealedCount)) {
-      game.state = GAME_STATES.WON;
-      game.flaggedCount += flagRemainingMines(game.board);
+  function finishTurn() {
+    startRowClearAnimation();
+
+    if (hasWon(game.board, game.revealedCount, game.mineCount)) {
+      return;
     }
+
+    checkOverflowLoss();
+  }
+
+  function startRowClearAnimation() {
+    if (game.clearingRows.length > 0) {
+      return;
+    }
+
+    const rows = findFullyRevealedSafeRows(game.board);
+    if (rows.length === 0) {
+      syncCounts();
+      return;
+    }
+
+    game.clearingRows = rows;
+    game.clearAnimationStartedAt = Date.now();
+    game.clearAnimationDuration = ROW_CLEAR_ANIMATION_MS;
+  }
+
+  function commitFinishedRowClearAnimation() {
+    if (game.clearingRows.length === 0) {
+      return;
+    }
+
+    const elapsed = Date.now() - game.clearAnimationStartedAt;
+    if (elapsed < game.clearAnimationDuration) {
+      return;
+    }
+
+    removeRows(game.board, game.clearingRows);
+    game.clearingRows = [];
+    game.clearAnimationStartedAt = 0;
+    syncCounts();
+  }
+
+  function syncCounts() {
+    game.mineCount = countMines(game.board);
+    game.flaggedCount = countFlags(game.board);
+    game.revealedCount = countRevealedSafeCells(game.board);
+  }
+
+  function checkOverflowLoss() {
+    if (game.board.length >= MAX_ROWS) {
+      game.state = GAME_STATES.LOST;
+      revealAllMines(game.board);
+      stopTimer();
+    }
+  }
+
+  function startTimer() {
+    if (game.startTime) {
+      return;
+    }
+
+    game.startTime = Date.now();
+    game.finishedAt = 0;
+    updateElapsedTime();
+  }
+
+  function stopTimer() {
+    if (!game.startTime || game.finishedAt) {
+      return;
+    }
+
+    game.finishedAt = Date.now();
+    updateElapsedTime();
   }
 
   reset();
@@ -131,7 +260,9 @@ function createGameController() {
     reset,
     revealCell,
     revealAroundNumber,
-    toggleFlag
+    toggleFlag,
+    tick,
+    updateElapsedTime
   };
 }
 

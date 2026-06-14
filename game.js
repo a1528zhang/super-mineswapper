@@ -20,6 +20,7 @@ const gameController = createGameController();
 const renderer = createRenderer(ctx, viewportWidth, viewportHeight);
 
 function draw() {
+  gameController.tick();
   renderer.draw(gameController.game);
 }
 
@@ -55,4 +56,18 @@ wx.onTouchStart(touchController.handleTouchStart);
 wx.onTouchEnd(touchController.handleTouchEnd);
 wx.onShow(draw);
 
-draw();
+function animate() {
+  draw();
+  scheduleNextFrame(animate);
+}
+
+function scheduleNextFrame(callback) {
+  if (typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(callback);
+    return;
+  }
+
+  setTimeout(callback, 16);
+}
+
+animate();

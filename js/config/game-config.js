@@ -1,6 +1,9 @@
-const ROWS = 9;
+const INITIAL_ROWS = 9;
+const MAX_ROWS = 18;
 const COLS = 9;
 const MINES = 10;
+const NEW_ROW_INTERVAL_SECONDS = 10;
+const ROW_CLEAR_ANIMATION_MS = 320;
 const DOUBLE_CLICK_MS = 300;
 const LONG_PRESS_MS = 450;
 
@@ -12,9 +15,12 @@ const GAME_STATES = {
 };
 
 module.exports = {
-  ROWS,
+  INITIAL_ROWS,
+  MAX_ROWS,
   COLS,
   MINES,
+  NEW_ROW_INTERVAL_SECONDS,
+  ROW_CLEAR_ANIMATION_MS,
   DOUBLE_CLICK_MS,
   LONG_PRESS_MS,
   GAME_STATES

@@ -1,10 +1,11 @@
-const { ROWS, COLS, MINES } = require('../config/game-config');
+const { COLS, INITIAL_ROWS, MINES } = require('../config/game-config');
 const { createCell } = require('../models/cell');
 
-function createBoard() {
+function createBoard(rows) {
+  const rowCount = rows || INITIAL_ROWS;
   const board = [];
 
-  for (let row = 0; row < ROWS; row += 1) {
+  for (let row = 0; row < rowCount; row += 1) {
     const line = [];
     for (let col = 0; col < COLS; col += 1) {
       line.push(createCell(row, col));
@@ -24,7 +25,7 @@ function forEachNeighbor(board, row, col, callback) {
 
       const nextRow = row + rowOffset;
       const nextCol = col + colOffset;
-      if (nextRow >= 0 && nextRow < ROWS && nextCol >= 0 && nextCol < COLS) {
+      if (nextRow >= 0 && nextRow < board.length && nextCol >= 0 && nextCol < COLS) {
         callback(board[nextRow][nextCol]);
       }
     }
@@ -45,9 +46,10 @@ function countAdjacentMines(board, row, col) {
 
 function placeMines(board, safeRow, safeCol) {
   let placed = 0;
+  const mineCount = Math.min(MINES, board.length * COLS - 1);
 
-  while (placed < MINES) {
-    const row = Math.floor(Math.random() * ROWS);
+  while (placed < mineCount) {
+    const row = Math.floor(Math.random() * board.length);
     const col = Math.floor(Math.random() * COLS);
     const cell = board[row][col];
     const isSafeCell = row === safeRow && col === safeCol;
@@ -59,22 +61,158 @@ function placeMines(board, safeRow, safeCol) {
     cell.mine = true;
     placed += 1;
   }
+  recalculateAdjacency(board);
+}
 
-  for (let row = 0; row < ROWS; row += 1) {
+function recalculateAdjacency(board) {
+  for (let row = 0; row < board.length; row += 1) {
     for (let col = 0; col < COLS; col += 1) {
+      board[row][col].row = row;
+      board[row][col].col = col;
       board[row][col].adjacent = countAdjacentMines(board, row, col);
     }
   }
 }
 
 function revealAllMines(board) {
-  for (let row = 0; row < ROWS; row += 1) {
+  for (let row = 0; row < board.length; row += 1) {
     for (let col = 0; col < COLS; col += 1) {
       if (board[row][col].mine) {
         board[row][col].revealed = true;
       }
     }
   }
+}
+
+function createGrowthRow(board) {
+  const row = [];
+  for (let col = 0; col < COLS; col += 1) {
+    row.push(createCell(0, col));
+  }
+
+  const mineCount = getGrowthMineCount(board);
+  let placed = 0;
+  while (placed < mineCount) {
+    const col = Math.floor(Math.random() * COLS);
+    if (row[col].mine) {
+      continue;
+    }
+
+    row[col].mine = true;
+    placed += 1;
+  }
+
+  return row;
+}
+
+function addGrowthRow(board) {
+  board.unshift(createGrowthRow(board));
+  recalculateAdjacency(board);
+}
+
+function findFullyRevealedSafeRows(board) {
+  const rows = [];
+
+  for (let row = 0; row < board.length; row += 1) {
+    if (isFullyRevealedSafeRow(board[row])) {
+      rows.push(row);
+    }
+  }
+
+  return rows;
+}
+
+function removeRows(board, rowsToRemove) {
+  if (!rowsToRemove || rowsToRemove.length === 0) {
+    return 0;
+  }
+
+  const lookup = {};
+  for (let i = 0; i < rowsToRemove.length; i += 1) {
+    lookup[rowsToRemove[i]] = true;
+  }
+
+  let removedRows = 0;
+  for (let row = board.length - 1; row >= 0; row -= 1) {
+    if (lookup[row]) {
+      board.splice(row, 1);
+      removedRows += 1;
+    }
+  }
+
+  if (removedRows) {
+    recalculateAdjacency(board);
+  }
+
+  return removedRows;
+}
+
+function removeFullyRevealedSafeRows(board) {
+  return removeRows(board, findFullyRevealedSafeRows(board));
+}
+
+function countMines(board) {
+  let total = 0;
+
+  for (let row = 0; row < board.length; row += 1) {
+    for (let col = 0; col < COLS; col += 1) {
+      if (board[row][col].mine) {
+        total += 1;
+      }
+    }
+  }
+
+  return total;
+}
+
+function countRevealedSafeCells(board) {
+  let total = 0;
+
+  for (let row = 0; row < board.length; row += 1) {
+    for (let col = 0; col < COLS; col += 1) {
+      const cell = board[row][col];
+      if (cell.revealed && !cell.mine) {
+        total += 1;
+      }
+    }
+  }
+
+  return total;
+}
+
+function countFlags(board) {
+  let total = 0;
+
+  for (let row = 0; row < board.length; row += 1) {
+    for (let col = 0; col < COLS; col += 1) {
+      if (board[row][col].flagged) {
+        total += 1;
+      }
+    }
+  }
+
+  return total;
+}
+
+function getGrowthMineCount(board) {
+  const mineRatio = Math.max(1, Math.round(MINES / INITIAL_ROWS));
+  const maxMines = COLS - 1;
+  return Math.min(maxMines, mineRatio + Math.floor(Math.random() * 2));
+}
+
+function isFullyRevealedSafeRow(row) {
+  for (let col = 0; col < row.length; col += 1) {
+    const cell = row[col];
+    if (cell.mine && cell.revealed) {
+      return false;
+    }
+
+    if (!cell.mine && !cell.revealed) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 function floodReveal(board, startCell) {
@@ -106,7 +244,15 @@ function floodReveal(board, startCell) {
 
 module.exports = {
   createBoard,
+  addGrowthRow,
+  countFlags,
+  countMines,
+  countRevealedSafeCells,
+  findFullyRevealedSafeRows,
   placeMines,
+  recalculateAdjacency,
+  removeRows,
+  removeFullyRevealedSafeRows,
   revealAllMines,
   floodReveal,
   forEachNeighbor
