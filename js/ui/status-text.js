@@ -1,12 +1,20 @@
 const { GAME_STATES } = require('../config/game-config');
 
-function getStatusText(state) {
+function getStatusText(state, stopReason, score) {
   if (state === GAME_STATES.WON) {
-    return '胜利！所有安全格都已打开';
+    return `胜利！最终分数 ${formatScore(score)}`;
   }
 
   if (state === GAME_STATES.LOST) {
-    return '踩雷了，点击重开再试一次';
+    if (stopReason === 'timeout') {
+      return `时间耗尽，最终分数 ${formatScore(score)}`;
+    }
+
+    if (stopReason === 'overflow') {
+      return `地图已满，最终分数 ${formatScore(score)}`;
+    }
+
+    return `踩雷了，最终分数 ${formatScore(score)}`;
   }
 
   if (state === GAME_STATES.READY) {
@@ -14,6 +22,10 @@ function getStatusText(state) {
   }
 
   return '继续排雷，长按可插旗';
+}
+
+function formatScore(score) {
+  return score || 0;
 }
 
 module.exports = {

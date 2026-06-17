@@ -10,6 +10,7 @@ function getLayout(viewportWidth, viewportHeight, rows) {
   const cellSize = Math.max(12, Math.min(maxCellWidth, maxCellHeight));
   const boardSize = cellSize * COLS;
   const boardHeight = cellSize * rowCount;
+  const maxBoardHeight = cellSize * MAX_ROWS;
   const boardX = Math.floor((viewportWidth - boardSize) / 2);
   const boardY = top;
 
@@ -19,6 +20,7 @@ function getLayout(viewportWidth, viewportHeight, rows) {
     cellSize,
     boardSize,
     boardHeight,
+    maxBoardHeight,
     boardX,
     boardY,
     timer: {
@@ -29,6 +31,12 @@ function getLayout(viewportWidth, viewportHeight, rows) {
     },
     resetButton: {
       x: viewportWidth - padding - 88,
+      y: 78,
+      width: 88,
+      height: 38
+    },
+    flagModeButton: {
+      x: viewportWidth - padding - 184,
       y: 78,
       width: 88,
       height: 38

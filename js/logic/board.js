@@ -1,14 +1,24 @@
-const { COLS, INITIAL_ROWS, MINES } = require('../config/game-config');
+const { COLS, INITIAL_ROWS, MINES, TIME_REWARD_CHANCE } = require('../config/game-config');
 const { createCell } = require('../models/cell');
+
+function createHiddenCell(row, col, now, withReward) {
+  const cell = createCell(row, col);
+  if (withReward && Math.random() < TIME_REWARD_CHANCE) {
+    cell.timeReward = true;
+    cell.timeRewardCreatedAt = now || Date.now();
+  }
+  return cell;
+}
 
 function createBoard(rows) {
   const rowCount = rows || INITIAL_ROWS;
   const board = [];
+  const now = Date.now();
 
   for (let row = 0; row < rowCount; row += 1) {
     const line = [];
     for (let col = 0; col < COLS; col += 1) {
-      line.push(createCell(row, col));
+      line.push(createHiddenCell(row, col, now, false));
     }
     board.push(line);
   }
@@ -86,8 +96,9 @@ function revealAllMines(board) {
 
 function createGrowthRow(board) {
   const row = [];
+  const now = Date.now();
   for (let col = 0; col < COLS; col += 1) {
-    row.push(createCell(0, col));
+    row.push(createHiddenCell(0, col, now, true));
   }
 
   const mineCount = getGrowthMineCount(board);
@@ -203,11 +214,15 @@ function getGrowthMineCount(board) {
 function isFullyRevealedSafeRow(row) {
   for (let col = 0; col < row.length; col += 1) {
     const cell = row[col];
-    if (cell.mine && cell.revealed) {
-      return false;
+
+    if (cell.mine) {
+      if (cell.revealed || !cell.flagged) {
+        return false;
+      }
+      continue;
     }
 
-    if (!cell.mine && !cell.revealed) {
+    if (cell.flagged || !cell.revealed) {
       return false;
     }
   }
@@ -217,7 +232,7 @@ function isFullyRevealedSafeRow(row) {
 
 function floodReveal(board, startCell) {
   const queue = [startCell];
-  let revealedCount = 0;
+  const revealedCells = [];
 
   while (queue.length > 0) {
     const cell = queue.shift();
@@ -226,7 +241,7 @@ function floodReveal(board, startCell) {
     }
 
     cell.revealed = true;
-    revealedCount += 1;
+    revealedCells.push(cell);
 
     if (cell.adjacent !== 0) {
       continue;
@@ -239,7 +254,7 @@ function floodReveal(board, startCell) {
     });
   }
 
-  return revealedCount;
+  return revealedCells;
 }
 
 module.exports = {

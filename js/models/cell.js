@@ -5,7 +5,9 @@ function createCell(row, col) {
     mine: false,
     revealed: false,
     flagged: false,
-    adjacent: 0
+    adjacent: 0,
+    timeReward: false,
+    timeRewardCreatedAt: 0
   };
 }
 

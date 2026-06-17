@@ -32,6 +32,11 @@ function drawCell(ctx, cell, x, y, size) {
 
   if (cell.flagged) {
     drawFlag(ctx, x + size / 2, y + size / 2, size);
+    return;
+  }
+
+  if (!cell.revealed && cell.timeReward) {
+    drawTimeReward(ctx, x + size / 2, y + size / 2, size);
   }
 }
 
@@ -78,6 +83,15 @@ function drawMine(ctx, centerX, centerY, size) {
   ctx.beginPath();
   ctx.arc(centerX - radius * 0.35, centerY - radius * 0.35, radius * 0.28, 0, Math.PI * 2);
   ctx.fill();
+}
+
+function drawTimeReward(ctx, centerX, centerY, size) {
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `700 ${Math.floor(size * 0.42)}px sans-serif`;
+  ctx.fillText('+', centerX, centerY - size * 0.08);
+
+  ctx.font = `700 ${Math.floor(size * 0.3)}px sans-serif`;
+  ctx.fillText('10', centerX, centerY + size * 0.2);
 }
 
 function getNumberColor(number) {

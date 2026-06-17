@@ -3,9 +3,10 @@ const { isInsideRect } = require('../ui/draw-utils');
 const { getCellFromPoint } = require('../ui/layout');
 
 function createTouchController(options) {
-  const { getLayout, onReset, onRevealAroundNumber, onRevealCell, onToggleFlag } = options;
+  const { getFlagMode, getLayout, onReset, onRevealAroundNumber, onRevealCell, onToggleFlag, onToggleFlagMode } = options;
   let touchStartTime = 0;
   let touchStartCell = null;
+  let touchStartPoint = null;
   let lastClickCell = null;
   let lastClickTime = 0;
 
@@ -13,10 +14,12 @@ function createTouchController(options) {
     const point = getTouchPoint(event);
     if (!point) {
       touchStartCell = null;
+      touchStartPoint = null;
       return;
     }
 
     touchStartTime = Date.now();
+    touchStartPoint = point;
     touchStartCell = getCellFromPoint(getLayout(), point.x, point.y);
   }
 
@@ -29,9 +32,18 @@ function createTouchController(options) {
     const layout = getLayout();
     const duration = Date.now() - touchStartTime;
     const startCell = touchStartCell;
+    const startPoint = touchStartPoint;
 
-    if (isInsideRect(point, layout.resetButton)) {
+    if (isButtonTap(startPoint, point, layout.resetButton)) {
       onReset();
+      clearLastClick();
+      return;
+    }
+
+    if (isButtonTap(startPoint, point, layout.flagModeButton)) {
+      if (onToggleFlagMode) {
+        onToggleFlagMode();
+      }
       clearLastClick();
       return;
     }
@@ -53,6 +65,13 @@ function createTouchController(options) {
       return;
     }
 
+    if (getFlagMode && getFlagMode()) {
+      onToggleFlag(endCell.row, endCell.col);
+      lastClickCell = endCell;
+      lastClickTime = Date.now();
+      return;
+    }
+
     onRevealCell(endCell.row, endCell.col);
     lastClickCell = endCell;
     lastClickTime = Date.now();
@@ -70,6 +89,10 @@ function createTouchController(options) {
   function clearLastClick() {
     lastClickCell = null;
     lastClickTime = 0;
+  }
+
+  function isButtonTap(startPoint, endPoint, rect) {
+    return isInsideRect(startPoint, rect) && isInsideRect(endPoint, rect);
   }
 
   return {

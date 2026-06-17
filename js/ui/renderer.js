@@ -1,4 +1,9 @@
-const { COLS, MAX_ROWS, NEW_ROW_INTERVAL_SECONDS } = require('../config/game-config');
+const {
+  COLS,
+  MAX_ROWS,
+  MIN_NEW_ROW_INTERVAL_SECONDS,
+  NEW_ROW_INTERVAL_SECONDS
+} = require('../config/game-config');
 const { drawCell } = require('./cell-view');
 const { roundRect } = require('./draw-utils');
 const { getLayout } = require('./layout');
@@ -13,7 +18,8 @@ function createRenderer(ctx, viewportWidth, viewportHeight) {
     drawHeader(game);
     drawTimer(game);
     drawBoard(game);
-    drawHint();
+    drawDeadline();
+    drawHint(game);
     return layout;
   }
 
@@ -27,7 +33,7 @@ function createRenderer(ctx, viewportWidth, viewportHeight) {
   }
 
   function drawHeader(game) {
-    const { resetButton, padding } = layout;
+    const { flagModeButton, resetButton, padding } = layout;
 
     ctx.fillStyle = '#162033';
     ctx.font = '700 28px sans-serif';
@@ -37,32 +43,60 @@ function createRenderer(ctx, viewportWidth, viewportHeight) {
 
     ctx.fillStyle = '#64748b';
     ctx.font = '14px sans-serif';
-    ctx.fillText(getStatusText(game.state), padding, 82);
+    ctx.fillText(getStatusText(game.state, game.stopReason, game.score), padding, 82);
 
-    drawInfoPill(padding, 102, `雷 ${game.mineCount}`);
-    drawInfoPill(padding + 66, 102, `旗 ${game.flaggedCount}`);
-    drawInfoPill(padding + 132, 102, `行 ${game.board.length}`);
+    drawInfoPills(game);
 
+    drawFlagModeButton(flagModeButton, game.flagMode);
+    drawResetButton(resetButton);
+  }
+
+  function drawFlagModeButton(button, active) {
+    ctx.fillStyle = active ? '#facc15' : '#e2e8f0';
+    roundRect(ctx, button.x, button.y, button.width, button.height, 8);
+    ctx.fill();
+
+    ctx.fillStyle = active ? '#713f12' : '#334155';
+    ctx.font = '700 15px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(active ? '插旗中' : '插旗', button.x + button.width / 2, button.y + button.height / 2 + 1);
+  }
+
+  function drawResetButton(button) {
     ctx.fillStyle = '#2563eb';
-    roundRect(ctx, resetButton.x, resetButton.y, resetButton.width, resetButton.height, 8);
+    roundRect(ctx, button.x, button.y, button.width, button.height, 8);
     ctx.fill();
 
     ctx.fillStyle = '#ffffff';
     ctx.font = '700 15px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('重开', resetButton.x + resetButton.width / 2, resetButton.y + resetButton.height / 2 + 1);
+    ctx.textBaseline = 'middle';
+    ctx.fillText('重开', button.x + button.width / 2, button.y + button.height / 2 + 1);
   }
 
-  function drawInfoPill(x, y, text) {
+  function drawInfoPills(game) {
+    const { resetButton, padding } = layout;
+    const items = [`雷 ${game.mineCount}`, `旗 ${game.flaggedCount}`, `行 ${game.board.length}`, `分 ${game.score}`];
+    const gap = 6;
+    const availableWidth = Math.max(160, resetButton.x - padding - 8);
+    const width = Math.floor((availableWidth - gap * (items.length - 1)) / items.length);
+
+    for (let i = 0; i < items.length; i += 1) {
+      drawInfoPill(padding + i * (width + gap), 102, width, items[i]);
+    }
+  }
+
+  function drawInfoPill(x, y, width, text) {
     ctx.fillStyle = '#e2e8f0';
-    roundRect(ctx, x, y, 56, 28, 8);
+    roundRect(ctx, x, y, width, 28, 8);
     ctx.fill();
 
     ctx.fillStyle = '#334155';
-    ctx.font = '700 13px sans-serif';
+    ctx.font = '700 12px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(text, x + 28, y + 15);
+    ctx.fillText(text, x + width / 2, y + 15);
   }
 
   function drawTimer(game) {
@@ -72,7 +106,7 @@ function createRenderer(ctx, viewportWidth, viewportHeight) {
     ctx.font = '700 24px monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(formatTime(game.elapsedSeconds), timer.x + timer.width / 2, timer.y + timer.height / 2 + 1);
+    ctx.fillText(formatTime(game.remainingSeconds), timer.x + timer.width / 2, timer.y + timer.height / 2 + 1);
   }
 
   function formatTime(seconds) {
@@ -89,11 +123,11 @@ function createRenderer(ctx, viewportWidth, viewportHeight) {
   }
 
   function drawBoard(game) {
-    const { boardX, boardY, boardSize, boardHeight, cellSize } = layout;
+    const { boardX, boardY, boardSize, maxBoardHeight, cellSize } = layout;
     const animation = getClearAnimation(game);
 
     ctx.fillStyle = '#94a3b8';
-    roundRect(ctx, boardX - 4, boardY - 4, boardSize + 8, boardHeight + 8, 8);
+    roundRect(ctx, boardX - 4, boardY - 4, boardSize + 8, maxBoardHeight + 8, 8);
     ctx.fill();
 
     for (let row = 0; row < game.board.length; row += 1) {
@@ -108,6 +142,27 @@ function createRenderer(ctx, viewportWidth, viewportHeight) {
 
       ctx.restore();
     }
+  }
+
+  function drawDeadline() {
+    const { boardX, boardY, boardSize, maxBoardHeight } = layout;
+    const y = boardY + maxBoardHeight;
+
+    ctx.save();
+    ctx.strokeStyle = '#dc2626';
+    ctx.lineWidth = 3;
+    if (ctx.setLineDash) {
+      ctx.setLineDash([10, 6]);
+    }
+    ctx.beginPath();
+    ctx.moveTo(boardX - 6, y + 0.5);
+    ctx.lineTo(boardX + boardSize + 6, y + 0.5);
+    ctx.stroke();
+    if (ctx.setLineDash) {
+      ctx.setLineDash([]);
+    }
+
+    ctx.restore();
   }
 
   function getClearAnimation(game) {
@@ -158,15 +213,16 @@ function createRenderer(ctx, viewportWidth, viewportHeight) {
     return 1 - Math.pow(1 - value, 3);
   }
 
-  function drawHint() {
-    const { boardY, boardHeight } = layout;
-    const y = boardY + boardHeight + 22;
+  function drawHint(game) {
+    const { boardY, maxBoardHeight } = layout;
+    const y = boardY + maxBoardHeight + 22;
 
     ctx.fillStyle = '#64748b';
     ctx.font = '12px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(`每 ${NEW_ROW_INTERVAL_SECONDS} 秒顶部增加一行，满 ${MAX_ROWS} 行失败`, viewportWidth / 2, y);
+    const interval = game.growthIntervalSeconds || NEW_ROW_INTERVAL_SECONDS;
+    ctx.fillText(`每 ${interval} 秒顶部增加一行，最低 ${MIN_NEW_ROW_INTERVAL_SECONDS} 秒，满 ${MAX_ROWS} 行失败`, viewportWidth / 2, y);
   }
 
   return {

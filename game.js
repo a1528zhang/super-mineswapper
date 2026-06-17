@@ -39,17 +39,24 @@ function toggleFlag(row, col) {
   draw();
 }
 
+function toggleFlagMode() {
+  gameController.toggleFlagMode();
+  draw();
+}
+
 function revealAroundNumber(row, col) {
   gameController.revealAroundNumber(row, col);
   draw();
 }
 
 const touchController = createTouchController({
+  getFlagMode: () => gameController.game.flagMode,
   getLayout: renderer.getLayout,
   onReset: resetGame,
   onRevealCell: revealCell,
   onRevealAroundNumber: revealAroundNumber,
-  onToggleFlag: toggleFlag
+  onToggleFlag: toggleFlag,
+  onToggleFlagMode: toggleFlagMode
 });
 
 wx.onTouchStart(touchController.handleTouchStart);
