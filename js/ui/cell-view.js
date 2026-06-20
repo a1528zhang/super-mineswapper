@@ -1,19 +1,8 @@
 const { roundRect } = require('./draw-utils');
+const { drawImageIcon } = require('./image-assets');
 
 function drawCell(ctx, cell, x, y, size) {
-  const gap = 2;
-  const innerX = x + gap;
-  const innerY = y + gap;
-  const innerSize = size - gap * 2;
-
-  if (cell.revealed) {
-    ctx.fillStyle = cell.mine ? '#fca5a5' : '#f8fafc';
-  } else {
-    ctx.fillStyle = cell.flagged ? '#facc15' : '#38bdf8';
-  }
-
-  roundRect(ctx, innerX, innerY, innerSize, innerSize, 5);
-  ctx.fill();
+  const baseImageName = drawCellBase(ctx, cell, x, y, size);
 
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -24,6 +13,10 @@ function drawCell(ctx, cell, x, y, size) {
   }
 
   if (cell.revealed && cell.adjacent > 0) {
+    if (baseImageName === `number${cell.adjacent}`) {
+      return;
+    }
+
     ctx.fillStyle = getNumberColor(cell.adjacent);
     ctx.font = `700 ${Math.floor(size * 0.46)}px sans-serif`;
     ctx.fillText(String(cell.adjacent), x + size / 2, y + size / 2 + 1);
@@ -40,7 +33,45 @@ function drawCell(ctx, cell, x, y, size) {
   }
 }
 
+function drawCellBase(ctx, cell, x, y, size) {
+  const imageName = getCellBaseImageName(cell);
+  if (imageName && drawImageIcon(ctx, imageName, x + size / 2, y + size / 2, size - 2)) {
+    return imageName;
+  }
+
+  const gap = 2;
+  const innerX = x + gap;
+  const innerY = y + gap;
+  const innerSize = size - gap * 2;
+
+  if (cell.revealed) {
+    ctx.fillStyle = cell.mine ? '#fca5a5' : '#f8fafc';
+  } else {
+    ctx.fillStyle = cell.flagged ? '#facc15' : '#38bdf8';
+  }
+
+  roundRect(ctx, innerX, innerY, innerSize, innerSize, 5);
+  ctx.fill();
+  return null;
+}
+
+function getCellBaseImageName(cell) {
+  if (!cell.revealed) {
+    return 'covered';
+  }
+
+  if (cell.mine) {
+    return 'empty';
+  }
+
+  return cell.adjacent > 0 ? `number${cell.adjacent}` : 'empty';
+}
+
 function drawFlag(ctx, centerX, centerY, size) {
+  if (drawImageIcon(ctx, 'flag', centerX, centerY, size * 0.66)) {
+    return;
+  }
+
   const poleHeight = size * 0.5;
   const poleX = centerX - size * 0.11;
   const poleTop = centerY - poleHeight * 0.5;
@@ -62,6 +93,10 @@ function drawFlag(ctx, centerX, centerY, size) {
 }
 
 function drawMine(ctx, centerX, centerY, size) {
+  if (drawImageIcon(ctx, 'mine', centerX, centerY, size * 0.68)) {
+    return;
+  }
+
   const radius = size * 0.18;
 
   ctx.strokeStyle = '#7f1d1d';
@@ -86,6 +121,10 @@ function drawMine(ctx, centerX, centerY, size) {
 }
 
 function drawTimeReward(ctx, centerX, centerY, size) {
+  if (drawImageIcon(ctx, 'time', centerX, centerY, size * 0.78)) {
+    return;
+  }
+
   ctx.fillStyle = '#ffffff';
   ctx.font = `700 ${Math.floor(size * 0.42)}px sans-serif`;
   ctx.fillText('+', centerX, centerY - size * 0.08);

@@ -3,7 +3,18 @@ const { isInsideRect } = require('../ui/draw-utils');
 const { getCellFromPoint } = require('../ui/layout');
 
 function createTouchController(options) {
-  const { getFlagMode, getLayout, onReset, onRevealAroundNumber, onRevealCell, onToggleFlag, onToggleFlagMode } = options;
+  const {
+    getFlagMode,
+    getLayout,
+    onGoHome,
+    onReset,
+    onRevealAroundNumber,
+    onRevealCell,
+    onShowRules,
+    onToggleMusic,
+    onToggleFlag,
+    onToggleFlagMode
+  } = options;
   let touchStartTime = 0;
   let touchStartCell = null;
   let touchStartPoint = null;
@@ -33,6 +44,30 @@ function createTouchController(options) {
     const duration = Date.now() - touchStartTime;
     const startCell = touchStartCell;
     const startPoint = touchStartPoint;
+
+    if (isButtonTap(startPoint, point, layout.homeButton)) {
+      if (onGoHome) {
+        onGoHome();
+      }
+      clearLastClick();
+      return;
+    }
+
+    if (isButtonTap(startPoint, point, layout.rulesButton)) {
+      if (onShowRules) {
+        onShowRules();
+      }
+      clearLastClick();
+      return;
+    }
+
+    if (isButtonTap(startPoint, point, layout.musicButton)) {
+      if (onToggleMusic) {
+        onToggleMusic();
+      }
+      clearLastClick();
+      return;
+    }
 
     if (isButtonTap(startPoint, point, layout.resetButton)) {
       onReset();

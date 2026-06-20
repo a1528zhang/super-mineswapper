@@ -1,25 +1,42 @@
 const {
   COLS,
-  MAX_ROWS,
-  MIN_NEW_ROW_INTERVAL_SECONDS,
-  NEW_ROW_INTERVAL_SECONDS
+  MAX_ROWS
 } = require('../config/game-config');
 const { drawCell } = require('./cell-view');
 const { roundRect } = require('./draw-utils');
+const { drawImageIcon, drawImageRect } = require('./image-assets');
 const { getLayout } = require('./layout');
-const { getStatusText } = require('./status-text');
+
+const RULE_LINES = [
+  '1. 点击格子翻开，首次点击不会踩雷。',
+  '2. 长按格子可以插旗；也可以点“插旗”切换插旗模式。',
+  '3. 双击已翻开的数字，周围旗子数量正确时会自动展开。',
+  '4. 一整行安全格都翻开，且剩余旗子都插在雷上时，该行会消失并得分。',
+  '5. 倒计时归零、踩到雷，或地图长到死线都会失败。',
+  '6. 部分格子会出现时间奖励，及时翻开可增加剩余时间。'
+];
 
 function createRenderer(ctx, viewportWidth, viewportHeight) {
   let layout = getLayout(viewportWidth, viewportHeight, MAX_ROWS);
 
-  function draw(game) {
+  function draw(game, options) {
     layout = getLayout(viewportWidth, viewportHeight, game.board.length || MAX_ROWS);
     drawBackground();
-    drawHeader(game);
+    if (options && options.showTitle) {
+      drawTitleScreen();
+      if (options.showRules) {
+        drawRulesModal();
+      }
+      return layout;
+    }
+
+    drawHeader(game, options || {});
     drawTimer(game);
     drawBoard(game);
     drawDeadline();
-    drawHint(game);
+    if (options && options.showRules) {
+      drawRulesModal();
+    }
     return layout;
   }
 
@@ -32,71 +49,306 @@ function createRenderer(ctx, viewportWidth, viewportHeight) {
     ctx.fill();
   }
 
-  function drawHeader(game) {
-    const { flagModeButton, resetButton, padding } = layout;
+  function drawTitleScreen() {
+    const { startButton } = layout;
+    const centerX = viewportWidth / 2;
+    const titleY = Math.max(78, viewportHeight * 0.12);
+    const iconSize = Math.min(238, viewportWidth - 104, viewportHeight * 0.3);
+    const iconY = Math.max(218, viewportHeight * 0.38);
 
-    ctx.fillStyle = '#162033';
-    ctx.font = '700 28px sans-serif';
-    ctx.textAlign = 'left';
+    drawTitleBackground();
+    drawTitleDecorations(centerX, iconY, iconSize);
+    drawTitleLogo(centerX, titleY);
+    drawTitleIconCard(centerX, iconY, iconSize);
+    drawStartButton(startButton);
+  }
+
+  function drawTitleBackground() {
+    ctx.save();
+    ctx.fillStyle = '#fbf7ee';
+    roundRect(ctx, 14, 18, viewportWidth - 28, viewportHeight - 36, 8);
+    ctx.fill();
+
+    ctx.globalAlpha = 0.42;
+    ctx.fillStyle = '#efe4cf';
+    ctx.translate(viewportWidth * 0.5, viewportHeight * 0.55);
+    ctx.rotate(-0.22);
+    roundRect(ctx, -viewportWidth * 0.58, -34, viewportWidth * 1.16, 68, 20);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawTitleDecorations(centerX, iconY, iconSize) {
+    drawFloatingIcon('mine', viewportWidth * 0.17, viewportHeight * 0.24, 34, -0.14);
+    drawFloatingIcon('flag', viewportWidth * 0.83, viewportHeight * 0.25, 34, 0.13);
+    drawFloatingIcon('score', viewportWidth * 0.18, viewportHeight * 0.63, 31, 0.12);
+    drawFloatingIcon('time', viewportWidth * 0.82, viewportHeight * 0.62, 33, -0.1);
+
+    drawMiniTile(viewportWidth * 0.2, viewportHeight * 0.78, 'number1', -0.08);
+    drawMiniTile(viewportWidth * 0.8, viewportHeight * 0.78, 'number2', 0.08);
+    drawMiniTile(viewportWidth * 0.12, iconY + iconSize * 0.16, 'number3', 0.1);
+    drawMiniTile(viewportWidth * 0.88, iconY + iconSize * 0.14, 'number4', -0.1);
+  }
+
+  function drawFloatingIcon(name, centerX, centerY, size, rotation) {
+    ctx.save();
+    ctx.translate(centerX, centerY);
+    ctx.rotate(rotation);
+    ctx.globalAlpha = 0.95;
+    if (!drawImageIcon(ctx, name, 0, 0, size)) {
+      ctx.fillStyle = '#d8cdb7';
+      ctx.beginPath();
+      ctx.arc(0, 0, size / 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawMiniTile(centerX, centerY, imageName, rotation) {
+    const size = 42;
+    ctx.save();
+    ctx.translate(centerX, centerY);
+    ctx.rotate(rotation);
+    ctx.globalAlpha = 0.9;
+    drawImageIcon(ctx, imageName, 0, 0, size);
+    ctx.restore();
+  }
+
+  function drawTitleIconCard(centerX, iconY, iconSize) {
+    const cardPadding = 14;
+    const cardSize = iconSize + cardPadding * 2;
+
+    ctx.save();
+    ctx.shadowColor = 'rgba(100, 80, 48, 0.18)';
+    ctx.shadowBlur = 22;
+    ctx.shadowOffsetY = 12;
+    ctx.fillStyle = '#ffffff';
+    roundRect(ctx, centerX - cardSize / 2, iconY - cardSize / 2, cardSize, cardSize, 28);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    roundRect(ctx, centerX - iconSize / 2, iconY - iconSize / 2, iconSize, iconSize, 26);
+    ctx.clip();
+    if (!drawImageRect(ctx, 'titleIcon', centerX, iconY, iconSize, iconSize)) {
+      ctx.fillStyle = '#6b5f4a';
+      ctx.font = '700 28px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('超级扫雷', centerX, iconY);
+    }
+    ctx.restore();
+  }
+
+  function drawTitleLogo(centerX, y) {
+    ctx.save();
+    ctx.translate(centerX, y);
+    ctx.rotate(-0.035);
+    ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('超级扫雷', padding, 46);
+    ctx.font = '900 42px sans-serif';
+    ctx.lineJoin = 'round';
 
-    ctx.fillStyle = '#64748b';
-    ctx.font = '14px sans-serif';
-    ctx.fillText(getStatusText(game.state, game.stopReason, game.score), padding, 82);
+    ctx.shadowColor = 'rgba(120, 53, 15, 0.32)';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 5;
+    ctx.strokeStyle = '#8a4b16';
+    ctx.lineWidth = 8;
+    ctx.strokeText('超级扫雷', 0, 0);
 
+    ctx.shadowColor = 'transparent';
+    ctx.fillStyle = '#ff4d2e';
+    ctx.fillText('超级扫雷', 3, 3);
+
+    ctx.strokeStyle = '#ffd166';
+    ctx.lineWidth = 4;
+    ctx.strokeText('超级扫雷', 0, 0);
+
+    ctx.fillStyle = '#ff8c1a';
+    ctx.fillText('超级扫雷', 0, 0);
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.72)';
+    ctx.font = '900 17px sans-serif';
+    ctx.fillText('SUPER MINESWEEPER', 0, 34);
+    drawTitleSpark(-104, -24, 7);
+    drawTitleSpark(108, -18, 6);
+    drawTitleSpark(82, 24, 4);
+    ctx.restore();
+  }
+
+  function drawTitleSpark(x, y, size) {
+    ctx.save();
+    ctx.fillStyle = '#fff3a3';
+    ctx.beginPath();
+    ctx.moveTo(x, y - size);
+    ctx.lineTo(x + size * 0.32, y - size * 0.32);
+    ctx.lineTo(x + size, y);
+    ctx.lineTo(x + size * 0.32, y + size * 0.32);
+    ctx.lineTo(x, y + size);
+    ctx.lineTo(x - size * 0.32, y + size * 0.32);
+    ctx.lineTo(x - size, y);
+    ctx.lineTo(x - size * 0.32, y - size * 0.32);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawStartButton(button) {
+    ctx.save();
+    ctx.shadowColor = 'rgba(199, 134, 30, 0.28)';
+    ctx.shadowBlur = 14;
+    ctx.shadowOffsetY = 7;
+    drawHeaderButton(button, '#ffe08a', '#c7861e');
+    ctx.restore();
+
+    ctx.fillStyle = '#713f12';
+    ctx.font = '700 20px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('开始游戏', button.x + button.width / 2, button.y + button.height / 2 + 1);
+  }
+
+  function drawHeader(game, options) {
+    const { flagModeButton, homeButton, musicButton, resetButton, rulesButton } = layout;
+
+    drawHomeButton(homeButton);
+    drawRulesButton(rulesButton);
+    drawMusicButton(musicButton, options.musicEnabled !== false);
     drawInfoPills(game);
 
     drawFlagModeButton(flagModeButton, game.flagMode);
     drawResetButton(resetButton);
   }
 
+  function drawHomeButton(button) {
+    drawHeaderButton(button, '#e9f1f7', '#b5c5d0');
+
+    ctx.fillStyle = '#334155';
+    ctx.font = '700 14px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('返回首页', button.x + button.width / 2, button.y + button.height / 2 + 1);
+  }
+
+  function drawRulesButton(button) {
+    drawHeaderButton(button, '#f3ead7', '#d8cdb7');
+
+    ctx.fillStyle = '#6b5f4a';
+    ctx.font = '700 14px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('玩法说明', button.x + button.width / 2, button.y + button.height / 2 + 1);
+  }
+
+  function drawMusicButton(button, enabled) {
+    drawHeaderButton(button, enabled ? '#dcfce7' : '#fee2e2', enabled ? '#86efac' : '#fecaca');
+
+    ctx.fillStyle = enabled ? '#166534' : '#991b1b';
+    ctx.font = '700 13px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(enabled ? '音乐开' : '音乐关', button.x + button.width / 2, button.y + button.height / 2 + 1);
+  }
+
   function drawFlagModeButton(button, active) {
-    ctx.fillStyle = active ? '#facc15' : '#e2e8f0';
-    roundRect(ctx, button.x, button.y, button.width, button.height, 8);
-    ctx.fill();
+    drawHeaderButton(button, active ? '#ffe08a' : '#f3ead7', active ? '#c7861e' : '#cdbf9e');
+
+    const iconSize = 18;
+    const text = active ? '插旗中' : '插旗';
+    const textWidth = measureButtonText(text);
+    const contentWidth = iconSize + 5 + textWidth;
+    const iconCenterX = button.x + (button.width - contentWidth) / 2 + iconSize / 2;
+    const centerY = button.y + button.height / 2;
+
+    drawImageIcon(ctx, 'flag', iconCenterX, centerY, iconSize);
 
     ctx.fillStyle = active ? '#713f12' : '#334155';
     ctx.font = '700 15px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(active ? '插旗中' : '插旗', button.x + button.width / 2, button.y + button.height / 2 + 1);
+    ctx.fillText(text, iconCenterX + iconSize / 2 + 5 + textWidth / 2, centerY + 1);
   }
 
   function drawResetButton(button) {
-    ctx.fillStyle = '#2563eb';
-    roundRect(ctx, button.x, button.y, button.width, button.height, 8);
-    ctx.fill();
+    drawHeaderButton(button, '#e9f1f7', '#b5c5d0');
 
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = '#334155';
     ctx.font = '700 15px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('重开', button.x + button.width / 2, button.y + button.height / 2 + 1);
   }
 
+  function drawHeaderButton(button, fill, stroke) {
+    ctx.fillStyle = fill;
+    roundRect(ctx, button.x, button.y, button.width, button.height, 10);
+    ctx.fill();
+
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = 2;
+    roundRect(ctx, button.x + 1, button.y + 1, button.width - 2, button.height - 2, 9);
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+    roundRect(ctx, button.x + 5, button.y + 4, button.width - 10, 9, 5);
+    ctx.fill();
+  }
+
+  function measureButtonText(text) {
+    ctx.save();
+    ctx.font = '700 15px sans-serif';
+    const width = ctx.measureText(text).width;
+    ctx.restore();
+    return width;
+  }
+
   function drawInfoPills(game) {
-    const { resetButton, padding } = layout;
-    const items = [`雷 ${game.mineCount}`, `旗 ${game.flaggedCount}`, `行 ${game.board.length}`, `分 ${game.score}`];
-    const gap = 6;
-    const availableWidth = Math.max(160, resetButton.x - padding - 8);
-    const width = Math.floor((availableWidth - gap * (items.length - 1)) / items.length);
+    const { flagModeButton, padding } = layout;
+    const items = [
+      { icon: 'mine', value: game.mineCount },
+      { icon: 'flag', value: game.flaggedCount },
+      { icon: 'score', value: game.score }
+    ];
+    const gap = 16;
+    let x = padding;
+    const y = flagModeButton.y + (flagModeButton.height - 28) / 2;
 
     for (let i = 0; i < items.length; i += 1) {
-      drawInfoPill(padding + i * (width + gap), 102, width, items[i]);
+      const width = getInfoItemWidth(items[i]);
+      drawInfoPill(x, y, width, items[i]);
+      x += width + gap;
     }
   }
 
-  function drawInfoPill(x, y, width, text) {
-    ctx.fillStyle = '#e2e8f0';
-    roundRect(ctx, x, y, width, 28, 8);
-    ctx.fill();
+  function getInfoItemWidth(item) {
+    ctx.save();
+    ctx.font = '700 15px sans-serif';
+    const iconSize = item.icon === 'flag' ? 21 : 20;
+    const valueWidth = ctx.measureText(String(item.value)).width;
+    ctx.restore();
+    return iconSize + 4 + valueWidth;
+  }
 
+  function drawInfoPill(x, y, width, item) {
     ctx.fillStyle = '#334155';
-    ctx.font = '700 12px sans-serif';
+    ctx.font = '700 15px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(text, x + width / 2, y + 15);
+
+    const iconSize = item.icon === 'flag' ? 21 : 20;
+    const valueText = String(item.value);
+    const valueWidth = ctx.measureText(valueText).width;
+    const contentWidth = iconSize + 4 + valueWidth;
+    const iconCenterX = x + (width - contentWidth) / 2 + iconSize / 2;
+    const centerY = y + 14;
+
+    if (item.icon && drawImageIcon(ctx, item.icon, iconCenterX, centerY, iconSize)) {
+      ctx.fillText(valueText, iconCenterX + iconSize / 2 + 4 + valueWidth / 2, centerY + 1);
+      return;
+    }
+
+    ctx.fillText(`${item.label || ''} ${valueText}`, x + width / 2, centerY + 1);
   }
 
   function drawTimer(game) {
@@ -124,15 +376,18 @@ function createRenderer(ctx, viewportWidth, viewportHeight) {
 
   function drawBoard(game) {
     const { boardX, boardY, boardSize, maxBoardHeight, cellSize } = layout;
-    const animation = getClearAnimation(game);
+    const clearAnimation = getClearAnimation(game);
+    const growAnimation = getGrowAnimation(game);
 
-    ctx.fillStyle = '#94a3b8';
+    ctx.fillStyle = '#d8cdb7';
     roundRect(ctx, boardX - 4, boardY - 4, boardSize + 8, maxBoardHeight + 8, 8);
     ctx.fill();
 
     for (let row = 0; row < game.board.length; row += 1) {
-      const drawY = boardY + row * cellSize + getRowOffset(row, animation, cellSize);
-      const alpha = getRowAlpha(row, animation);
+      const drawY = boardY + row * cellSize +
+        getGrowRowOffset(row, growAnimation, cellSize) +
+        getClearRowOffset(row, clearAnimation, cellSize);
+      const alpha = getGrowRowAlpha(row, growAnimation) * getClearRowAlpha(row, clearAnimation);
       ctx.save();
       ctx.globalAlpha = alpha;
 
@@ -144,25 +399,154 @@ function createRenderer(ctx, viewportWidth, viewportHeight) {
     }
   }
 
+  function getGrowAnimation(game) {
+    if (!game.growingRows) {
+      return null;
+    }
+
+    const elapsed = Date.now() - game.growAnimationStartedAt;
+    const duration = game.growAnimationDuration || 1;
+    const progress = Math.min(1, Math.max(0, elapsed / duration));
+
+    return {
+      progress: easeOutCubic(progress),
+      fadeProgress: easeOutCubic(progress),
+      rowCount: game.growingRows
+    };
+  }
+
   function drawDeadline() {
     const { boardX, boardY, boardSize, maxBoardHeight } = layout;
     const y = boardY + maxBoardHeight;
+    const centerX = boardX + boardSize / 2;
+    const skullSize = 30;
+    const skullGap = skullSize / 2 + 8;
 
     ctx.save();
     ctx.strokeStyle = '#dc2626';
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
     if (ctx.setLineDash) {
-      ctx.setLineDash([10, 6]);
+      ctx.setLineDash([9, 8]);
     }
+
     ctx.beginPath();
-    ctx.moveTo(boardX - 6, y + 0.5);
+    ctx.moveTo(centerX - skullGap, y + 0.5);
+    ctx.lineTo(boardX - 6, y + 0.5);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(centerX + skullGap, y + 0.5);
     ctx.lineTo(boardX + boardSize + 6, y + 0.5);
     ctx.stroke();
+
     if (ctx.setLineDash) {
       ctx.setLineDash([]);
     }
 
+    if (!drawImageIcon(ctx, 'skull', centerX, y, skullSize)) {
+      ctx.fillStyle = '#dc2626';
+      ctx.beginPath();
+      ctx.arc(centerX, y, 7, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
     ctx.restore();
+  }
+
+  function drawRulesModal() {
+    const { rulesCloseButton, rulesModal } = layout;
+    const modalPadding = 22;
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.46)';
+    ctx.fillRect(0, 0, viewportWidth, viewportHeight);
+
+    ctx.shadowColor = 'rgba(15, 23, 42, 0.22)';
+    ctx.shadowBlur = 24;
+    ctx.shadowOffsetY = 12;
+    ctx.fillStyle = '#fffaf0';
+    roundRect(ctx, rulesModal.x, rulesModal.y, rulesModal.width, rulesModal.height, 14);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    ctx.strokeStyle = '#d8cdb7';
+    ctx.lineWidth = 2;
+    roundRect(ctx, rulesModal.x + 1, rulesModal.y + 1, rulesModal.width - 2, rulesModal.height - 2, 13);
+    ctx.stroke();
+
+    ctx.fillStyle = '#713f12';
+    ctx.font = '900 24px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('玩法说明', rulesModal.x + modalPadding, rulesModal.y + 31);
+
+    drawCloseButton(rulesCloseButton);
+    drawRuleLines(
+      RULE_LINES,
+      rulesModal.x + modalPadding,
+      rulesModal.y + 72,
+      rulesModal.width - modalPadding * 2,
+      rulesModal.height - 96
+    );
+    ctx.restore();
+  }
+
+  function drawCloseButton(button) {
+    drawHeaderButton(button, '#e9f1f7', '#b5c5d0');
+
+    ctx.strokeStyle = '#334155';
+    ctx.lineWidth = 2.4;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(button.x + 10, button.y + 10);
+    ctx.lineTo(button.x + button.width - 10, button.y + button.height - 10);
+    ctx.moveTo(button.x + button.width - 10, button.y + 10);
+    ctx.lineTo(button.x + 10, button.y + button.height - 10);
+    ctx.stroke();
+  }
+
+  function drawRuleLines(lines, x, y, maxWidth, maxHeight) {
+    ctx.fillStyle = '#334155';
+    ctx.font = '700 15px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+
+    const lineHeight = 22;
+    let cursorY = y;
+    for (let i = 0; i < lines.length; i += 1) {
+      const wrapped = wrapText(lines[i], maxWidth);
+      for (let j = 0; j < wrapped.length; j += 1) {
+        if (cursorY + lineHeight > y + maxHeight) {
+          return;
+        }
+        ctx.fillText(wrapped[j], x, cursorY);
+        cursorY += lineHeight;
+      }
+      cursorY += 8;
+    }
+  }
+
+  function wrapText(text, maxWidth) {
+    const lines = [];
+    let line = '';
+
+    for (let i = 0; i < text.length; i += 1) {
+      const nextLine = line + text[i];
+      if (line && ctx.measureText(nextLine).width > maxWidth) {
+        lines.push(line);
+        line = text[i];
+        continue;
+      }
+      line = nextLine;
+    }
+
+    if (line) {
+      lines.push(line);
+    }
+
+    return lines;
   }
 
   function getClearAnimation(game) {
@@ -186,7 +570,16 @@ function createRenderer(ctx, viewportWidth, viewportHeight) {
     };
   }
 
-  function getRowOffset(row, animation, cellSize) {
+  function getGrowRowOffset(row, animation, cellSize) {
+    if (!animation) {
+      return 0;
+    }
+
+    const distance = animation.rowCount * cellSize;
+    return -distance * (1 - animation.progress);
+  }
+
+  function getClearRowOffset(row, animation, cellSize) {
     if (!animation) {
       return 0;
     }
@@ -201,7 +594,15 @@ function createRenderer(ctx, viewportWidth, viewportHeight) {
     return -clearedRowsAbove * cellSize * easeOutCubic(animation.progress);
   }
 
-  function getRowAlpha(row, animation) {
+  function getGrowRowAlpha(row, animation) {
+    if (!animation || row >= animation.rowCount) {
+      return 1;
+    }
+
+    return animation.fadeProgress;
+  }
+
+  function getClearRowAlpha(row, animation) {
     if (!animation || !animation.rows[row]) {
       return 1;
     }
@@ -211,18 +612,6 @@ function createRenderer(ctx, viewportWidth, viewportHeight) {
 
   function easeOutCubic(value) {
     return 1 - Math.pow(1 - value, 3);
-  }
-
-  function drawHint(game) {
-    const { boardY, maxBoardHeight } = layout;
-    const y = boardY + maxBoardHeight + 22;
-
-    ctx.fillStyle = '#64748b';
-    ctx.font = '12px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    const interval = game.growthIntervalSeconds || NEW_ROW_INTERVAL_SECONDS;
-    ctx.fillText(`每 ${interval} 秒顶部增加一行，最低 ${MIN_NEW_ROW_INTERVAL_SECONDS} 秒，满 ${MAX_ROWS} 行失败`, viewportWidth / 2, y);
   }
 
   return {

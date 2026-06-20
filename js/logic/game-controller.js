@@ -7,8 +7,10 @@ const {
   ROW_CLEAR_ANIMATION_MS,
   DIFFICULTY_STEP_SECONDS,
   TIME_LIMIT_SECONDS,
+  TIME_REWARD_CHANCE,
   TIME_REWARD_LIFETIME_SECONDS,
-  TIME_REWARD_SECONDS
+  TIME_REWARD_SECONDS,
+  ROW_GROW_ANIMATION_MS
 } = require('../config/game-config');
 const {
   addGrowthRow,
@@ -45,7 +47,10 @@ function createGameController() {
     stopReason: '',
     clearingRows: [],
     clearAnimationStartedAt: 0,
-    clearAnimationDuration: ROW_CLEAR_ANIMATION_MS
+    clearAnimationDuration: ROW_CLEAR_ANIMATION_MS,
+    growingRows: 0,
+    growAnimationStartedAt: 0,
+    growAnimationDuration: ROW_GROW_ANIMATION_MS
   };
 
   function reset() {
@@ -68,6 +73,9 @@ function createGameController() {
     game.clearingRows = [];
     game.clearAnimationStartedAt = 0;
     game.clearAnimationDuration = ROW_CLEAR_ANIMATION_MS;
+    game.growingRows = 0;
+    game.growAnimationStartedAt = 0;
+    game.growAnimationDuration = ROW_GROW_ANIMATION_MS;
   }
 
   function revealCell(row, col) {
@@ -159,7 +167,12 @@ function createGameController() {
     }
 
     cell.flagged = !cell.flagged;
+    if (cell.flagged && cell.timeReward) {
+      cell.timeReward = false;
+      cell.timeRewardCreatedAt = 0;
+    }
     game.flaggedCount += cell.flagged ? 1 : -1;
+    startRowClearAnimation();
 
     if (game.state === GAME_STATES.READY && !game.firstMove) {
       game.state = GAME_STATES.PLAYING;
@@ -191,6 +204,7 @@ function createGameController() {
     updateElapsedTime();
     expireTimeRewards();
     commitFinishedRowClearAnimation();
+    commitFinishedRowGrowAnimation();
 
     if (game.state !== GAME_STATES.PLAYING) {
       return;
@@ -207,7 +221,7 @@ function createGameController() {
     fillMinimumRows();
 
     while (game.elapsedSeconds >= game.nextGrowthAt && game.state === GAME_STATES.PLAYING) {
-      addGrowthRow(game.board);
+      addAnimatedGrowthRow();
       game.mineCount = countMines(game.board);
       game.flaggedCount = countFlags(game.board);
       game.revealedCount = countRevealedSafeCells(game.board);
@@ -220,7 +234,7 @@ function createGameController() {
     let addedRows = 0;
 
     while (game.board.length < MIN_ROWS && game.state === GAME_STATES.PLAYING) {
-      addGrowthRow(game.board);
+      addAnimatedGrowthRow();
       addedRows += 1;
       checkOverflowLoss();
     }
@@ -238,6 +252,7 @@ function createGameController() {
     const revealedCells = floodReveal(game.board, cell);
     game.revealedCount += revealedCells.length;
     collectTimeRewards(revealedCells);
+    spawnTimeRewards(revealedCells.length);
   }
 
   function collectTimeRewards(cells) {
@@ -263,6 +278,29 @@ function createGameController() {
         if (!cell.revealed && cell.timeReward && now - cell.timeRewardCreatedAt >= lifetimeMs) {
           cell.timeReward = false;
           cell.timeRewardCreatedAt = 0;
+        }
+      }
+    }
+  }
+
+  function spawnTimeRewards(revealCount) {
+    if (!revealCount) {
+      return;
+    }
+
+    const now = Date.now();
+    const spawnChance = 1 - Math.pow(1 - TIME_REWARD_CHANCE, revealCount);
+
+    for (let row = 0; row < game.board.length; row += 1) {
+      for (let col = 0; col < game.board[row].length; col += 1) {
+        const cell = game.board[row][col];
+        if (cell.revealed || cell.flagged || cell.timeReward) {
+          continue;
+        }
+
+        if (Math.random() < spawnChance) {
+          cell.timeReward = true;
+          cell.timeRewardCreatedAt = now;
         }
       }
     }
@@ -319,6 +357,17 @@ function createGameController() {
     return Math.max(MIN_NEW_ROW_INTERVAL_SECONDS, NEW_ROW_INTERVAL_SECONDS - difficultySteps);
   }
 
+  function addAnimatedGrowthRow() {
+    addGrowthRow(game.board);
+    startRowGrowAnimation(1);
+  }
+
+  function startRowGrowAnimation(rowCount) {
+    game.growingRows += rowCount;
+    game.growAnimationStartedAt = Date.now();
+    game.growAnimationDuration = ROW_GROW_ANIMATION_MS;
+  }
+
   function commitFinishedRowClearAnimation() {
     if (game.clearingRows.length === 0) {
       return;
@@ -333,6 +382,20 @@ function createGameController() {
     game.clearingRows = [];
     game.clearAnimationStartedAt = 0;
     syncCounts();
+  }
+
+  function commitFinishedRowGrowAnimation() {
+    if (!game.growingRows) {
+      return;
+    }
+
+    const elapsed = Date.now() - game.growAnimationStartedAt;
+    if (elapsed < game.growAnimationDuration) {
+      return;
+    }
+
+    game.growingRows = 0;
+    game.growAnimationStartedAt = 0;
   }
 
   function syncCounts() {

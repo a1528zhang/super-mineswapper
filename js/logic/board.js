@@ -1,24 +1,17 @@
-const { COLS, INITIAL_ROWS, MINES, TIME_REWARD_CHANCE } = require('../config/game-config');
+const { COLS, INITIAL_ROWS, MINES } = require('../config/game-config');
 const { createCell } = require('../models/cell');
 
-function createHiddenCell(row, col, now, withReward) {
-  const cell = createCell(row, col);
-  if (withReward && Math.random() < TIME_REWARD_CHANCE) {
-    cell.timeReward = true;
-    cell.timeRewardCreatedAt = now || Date.now();
-  }
-  return cell;
+function createHiddenCell(row, col) {
+  return createCell(row, col);
 }
 
 function createBoard(rows) {
   const rowCount = rows || INITIAL_ROWS;
   const board = [];
-  const now = Date.now();
-
   for (let row = 0; row < rowCount; row += 1) {
     const line = [];
     for (let col = 0; col < COLS; col += 1) {
-      line.push(createHiddenCell(row, col, now, false));
+      line.push(createHiddenCell(row, col));
     }
     board.push(line);
   }
@@ -96,9 +89,8 @@ function revealAllMines(board) {
 
 function createGrowthRow(board) {
   const row = [];
-  const now = Date.now();
   for (let col = 0; col < COLS; col += 1) {
-    row.push(createHiddenCell(0, col, now, true));
+    row.push(createHiddenCell(0, col));
   }
 
   const mineCount = getGrowthMineCount(board);
