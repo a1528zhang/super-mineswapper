@@ -224,31 +224,19 @@ function createRenderer(ctx, viewportWidth, viewportHeight) {
   function drawHomeButton(button) {
     drawHeaderButton(button, '#e9f1f7', '#b5c5d0');
 
-    ctx.fillStyle = '#334155';
-    ctx.font = '700 14px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('返回首页', button.x + button.width / 2, button.y + button.height / 2 + 1);
+    drawButtonImageIcon(button, 'exit') || drawBackIcon(button, '#334155');
   }
 
   function drawRulesButton(button) {
     drawHeaderButton(button, '#f3ead7', '#d8cdb7');
 
-    ctx.fillStyle = '#6b5f4a';
-    ctx.font = '700 14px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('玩法说明', button.x + button.width / 2, button.y + button.height / 2 + 1);
+    drawButtonImageIcon(button, 'help') || drawQuestionIcon(button, '#6b5f4a');
   }
 
   function drawMusicButton(button, enabled) {
     drawHeaderButton(button, enabled ? '#dcfce7' : '#fee2e2', enabled ? '#86efac' : '#fecaca');
 
-    ctx.fillStyle = enabled ? '#166534' : '#991b1b';
-    ctx.font = '700 13px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(enabled ? '音乐开' : '音乐关', button.x + button.width / 2, button.y + button.height / 2 + 1);
+    drawButtonImageIcon(button, 'volume') || drawSoundIcon(button, enabled);
   }
 
   function drawFlagModeButton(button, active) {
@@ -273,26 +261,133 @@ function createRenderer(ctx, viewportWidth, viewportHeight) {
   function drawResetButton(button) {
     drawHeaderButton(button, '#e9f1f7', '#b5c5d0');
 
-    ctx.fillStyle = '#334155';
-    ctx.font = '700 15px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('重开', button.x + button.width / 2, button.y + button.height / 2 + 1);
+    drawButtonImageIcon(button, 'repeat') || drawReplayIcon(button, '#334155');
   }
 
   function drawHeaderButton(button, fill, stroke) {
     ctx.fillStyle = fill;
-    roundRect(ctx, button.x, button.y, button.width, button.height, 10);
+    roundRect(ctx, button.x, button.y, button.width, button.height, 8);
     ctx.fill();
 
     ctx.strokeStyle = stroke;
     ctx.lineWidth = 2;
-    roundRect(ctx, button.x + 1, button.y + 1, button.width - 2, button.height - 2, 9);
+    roundRect(ctx, button.x + 1, button.y + 1, button.width - 2, button.height - 2, 7);
     ctx.stroke();
 
     ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
     roundRect(ctx, button.x + 5, button.y + 4, button.width - 10, 9, 5);
     ctx.fill();
+  }
+
+  function drawButtonImageIcon(button, imageName) {
+    const centerX = button.x + button.width / 2;
+    const centerY = button.y + button.height / 2;
+    const iconSize = Math.min(button.width, button.height) - 10;
+
+    return drawImageIcon(ctx, imageName, centerX, centerY, iconSize);
+  }
+
+  function drawBackIcon(button, color) {
+    const centerX = button.x + button.width / 2;
+    const centerY = button.y + button.height / 2;
+
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2.6;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(centerX + 6, centerY - 8);
+    ctx.lineTo(centerX - 5, centerY);
+    ctx.lineTo(centerX + 6, centerY + 8);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawQuestionIcon(button, color) {
+    const centerX = button.x + button.width / 2;
+    const centerY = button.y + button.height / 2;
+
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2.4;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, 10, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.fillStyle = color;
+    ctx.font = '900 19px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('?', centerX, centerY + 1);
+    ctx.restore();
+  }
+
+  function drawSoundIcon(button, enabled) {
+    const color = enabled ? '#166534' : '#991b1b';
+    const centerX = button.x + button.width / 2;
+    const centerY = button.y + button.height / 2;
+
+    ctx.save();
+    ctx.fillStyle = color;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2.2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    ctx.beginPath();
+    ctx.moveTo(centerX - 10, centerY - 4);
+    ctx.lineTo(centerX - 6, centerY - 4);
+    ctx.lineTo(centerX, centerY - 9);
+    ctx.lineTo(centerX, centerY + 9);
+    ctx.lineTo(centerX - 6, centerY + 4);
+    ctx.lineTo(centerX - 10, centerY + 4);
+    ctx.closePath();
+    ctx.fill();
+
+    if (enabled) {
+      ctx.beginPath();
+      ctx.arc(centerX + 2, centerY, 6, -0.72, 0.72);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(centerX + 3, centerY, 10, -0.66, 0.66);
+      ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(centerX + 5, centerY - 6);
+      ctx.lineTo(centerX + 13, centerY + 6);
+      ctx.moveTo(centerX + 13, centerY - 6);
+      ctx.lineTo(centerX + 5, centerY + 6);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawReplayIcon(button, color) {
+    const centerX = button.x + button.width / 2;
+    const centerY = button.y + button.height / 2;
+    const radius = Math.min(button.width, button.height) * 0.25;
+
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.lineWidth = 2.6;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, radius, -0.22, Math.PI * 1.55);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(centerX + radius - 1, centerY - radius - 4);
+    ctx.lineTo(centerX + radius + 8, centerY - radius - 1);
+    ctx.lineTo(centerX + radius + 2, centerY + radius * 0.38);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
   }
 
   function measureButtonText(text) {
@@ -310,7 +405,7 @@ function createRenderer(ctx, viewportWidth, viewportHeight) {
       { icon: 'flag', value: game.flaggedCount },
       { icon: 'score', value: game.score }
     ];
-    const gap = 16;
+    const gap = 14;
     let x = padding;
     const y = flagModeButton.y + (flagModeButton.height - 28) / 2;
 
@@ -325,9 +420,10 @@ function createRenderer(ctx, viewportWidth, viewportHeight) {
     ctx.save();
     ctx.font = '700 15px sans-serif';
     const iconSize = item.icon === 'flag' ? 21 : 20;
-    const valueWidth = ctx.measureText(String(item.value)).width;
+    const valueText = String(item.value);
+    const valueSlotWidth = Math.max(ctx.measureText('000').width, ctx.measureText(valueText).width);
     ctx.restore();
-    return iconSize + 4 + valueWidth;
+    return iconSize + 6 + valueSlotWidth;
   }
 
   function drawInfoPill(x, y, width, item) {
@@ -339,12 +435,13 @@ function createRenderer(ctx, viewportWidth, viewportHeight) {
     const iconSize = item.icon === 'flag' ? 21 : 20;
     const valueText = String(item.value);
     const valueWidth = ctx.measureText(valueText).width;
-    const contentWidth = iconSize + 4 + valueWidth;
-    const iconCenterX = x + (width - contentWidth) / 2 + iconSize / 2;
+    const valueSlotWidth = Math.max(ctx.measureText('000').width, valueWidth);
+    const iconCenterX = x + iconSize / 2;
+    const textCenterX = x + iconSize + 6 + valueSlotWidth / 2;
     const centerY = y + 14;
 
     if (item.icon && drawImageIcon(ctx, item.icon, iconCenterX, centerY, iconSize)) {
-      ctx.fillText(valueText, iconCenterX + iconSize / 2 + 4 + valueWidth / 2, centerY + 1);
+      ctx.fillText(valueText, textCenterX, centerY + 1);
       return;
     }
 
@@ -418,9 +515,6 @@ function createRenderer(ctx, viewportWidth, viewportHeight) {
   function drawDeadline() {
     const { boardX, boardY, boardSize, maxBoardHeight } = layout;
     const y = boardY + maxBoardHeight;
-    const centerX = boardX + boardSize / 2;
-    const skullSize = 30;
-    const skullGap = skullSize / 2 + 8;
 
     ctx.save();
     ctx.strokeStyle = '#dc2626';
@@ -431,24 +525,12 @@ function createRenderer(ctx, viewportWidth, viewportHeight) {
     }
 
     ctx.beginPath();
-    ctx.moveTo(centerX - skullGap, y + 0.5);
-    ctx.lineTo(boardX - 6, y + 0.5);
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.moveTo(centerX + skullGap, y + 0.5);
-    ctx.lineTo(boardX + boardSize + 6, y + 0.5);
+    ctx.moveTo(boardX, y + 0.5);
+    ctx.lineTo(boardX + boardSize, y + 0.5);
     ctx.stroke();
 
     if (ctx.setLineDash) {
       ctx.setLineDash([]);
-    }
-
-    if (!drawImageIcon(ctx, 'skull', centerX, y, skullSize)) {
-      ctx.fillStyle = '#dc2626';
-      ctx.beginPath();
-      ctx.arc(centerX, y, 7, 0, Math.PI * 2);
-      ctx.fill();
     }
 
     ctx.restore();

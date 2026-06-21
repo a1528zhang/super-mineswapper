@@ -14,14 +14,12 @@ function getLayout(viewportWidth, viewportHeight, rows) {
   const boardX = Math.floor((viewportWidth - boardSize) / 2);
   const boardY = top;
   const headerButtonY = 34;
-  const headerButtonHeight = 32;
-  const headerButtonGap = 10;
-  const homeButtonWidth = 92;
-  const musicButtonWidth = 70;
-  const rulesButtonWidth = Math.max(
-    88,
-    viewportWidth - padding * 2 - homeButtonWidth - musicButtonWidth - headerButtonGap * 2
-  );
+  const headerButtonSize = 32;
+  const headerButtonGap = 8;
+  const headerButtonX = padding - 6;
+  const actionButtonSize = headerButtonSize;
+  const flagModeButtonWidth = 72;
+  const actionButtonY = 82;
   const modalWidth = Math.min(viewportWidth - padding * 2, 336);
   const modalHeight = Math.min(viewportHeight - 100, 436);
   const modalX = Math.floor((viewportWidth - modalWidth) / 2);
@@ -49,22 +47,22 @@ function getLayout(viewportWidth, viewportHeight, rows) {
       height: 32
     },
     homeButton: {
-      x: padding,
+      x: headerButtonX + headerButtonSize + headerButtonGap,
       y: headerButtonY,
-      width: homeButtonWidth,
-      height: headerButtonHeight
+      width: headerButtonSize,
+      height: headerButtonSize
     },
     rulesButton: {
-      x: padding + homeButtonWidth + headerButtonGap,
+      x: headerButtonX + (headerButtonSize + headerButtonGap) * 2,
       y: headerButtonY,
-      width: rulesButtonWidth,
-      height: headerButtonHeight
+      width: headerButtonSize,
+      height: headerButtonSize
     },
     musicButton: {
-      x: padding + homeButtonWidth + headerButtonGap + rulesButtonWidth + headerButtonGap,
+      x: headerButtonX,
       y: headerButtonY,
-      width: musicButtonWidth,
-      height: headerButtonHeight
+      width: headerButtonSize,
+      height: headerButtonSize
     },
     rulesModal: {
       x: modalX,
@@ -79,16 +77,16 @@ function getLayout(viewportWidth, viewportHeight, rows) {
       height: 32
     },
     resetButton: {
-      x: viewportWidth - padding - 88,
-      y: 82,
-      width: 88,
-      height: 38
+      x: viewportWidth - padding - actionButtonSize,
+      y: actionButtonY,
+      width: actionButtonSize,
+      height: actionButtonSize
     },
     flagModeButton: {
-      x: viewportWidth - padding - 184,
-      y: 82,
-      width: 88,
-      height: 38
+      x: viewportWidth - padding - actionButtonSize - headerButtonGap - flagModeButtonWidth,
+      y: actionButtonY,
+      width: flagModeButtonWidth,
+      height: actionButtonSize
     },
     startButton: {
       x: Math.floor((viewportWidth - 172) / 2),

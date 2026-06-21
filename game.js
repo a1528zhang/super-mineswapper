@@ -13,8 +13,10 @@ const viewportHeight = systemInfo.windowHeight;
 
 canvas.width = Math.floor(viewportWidth * pixelRatio);
 canvas.height = Math.floor(viewportHeight * pixelRatio);
-canvas.style.width = `${viewportWidth}px`;
-canvas.style.height = `${viewportHeight}px`;
+if (canvas.style) {
+  canvas.style.width = `${viewportWidth}px`;
+  canvas.style.height = `${viewportHeight}px`;
+}
 ctx.scale(pixelRatio, pixelRatio);
 
 const gameController = createGameController();
